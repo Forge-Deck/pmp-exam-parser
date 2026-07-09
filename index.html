@@ -1,0 +1,1058 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PMI Exam Analysis Raw Score Parser</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1117;
+      --panel: #171a22;
+      --panel-2: #1f2430;
+      --text: #e8eaf0;
+      --muted: #a9afbf;
+      --line: #323849;
+      --accent: #7c5cff;
+      --ok: #24c08b;
+      --warn: #ffc857;
+      --bad: #ff6b6b;
+      --info: #4da3ff;
+      --shadow: 0 20px 60px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(124,92,255,.24), transparent 32rem),
+        radial-gradient(circle at bottom right, rgba(36,192,139,.14), transparent 28rem),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    main {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 42px 0 70px;
+    }
+
+    header {
+      display: block;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 4.2rem);
+      letter-spacing: -0.06em;
+      line-height: .95;
+    }
+
+    .subhead {
+      max-width: 780px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(340px, .9fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02)), var(--panel);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .card-inner { padding: 18px; }
+
+    .card h2,
+    .card h3 {
+      margin: 0 0 12px;
+      letter-spacing: -0.02em;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 430px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #0b0d12;
+      color: var(--text);
+      padding: 14px;
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      outline: none;
+    }
+
+    textarea:focus { border-color: rgba(124,92,255,.8); box-shadow: 0 0 0 3px rgba(124,92,255,.18); }
+
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+
+    button,
+    .file-button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: .92rem;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+    }
+
+    button.secondary,
+    .file-button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    button:hover,
+    .file-button:hover { filter: brightness(1.08); }
+    input[type="file"] { display: none; }
+
+    .dropzone {
+      border: 1px dashed var(--line);
+      background: rgba(255,255,255,.035);
+      color: var(--muted);
+      padding: 14px;
+      border-radius: 14px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .dropzone.dragging { border-color: var(--accent); color: var(--text); background: rgba(124,92,255,.1); }
+
+    .muted { color: var(--muted); }
+    .small { font-size: .84rem; }
+    code { color: #d7cbff; }
+
+    .status { display: none; margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(77,163,255,.12); color: #cfe5ff; border: 1px solid rgba(77,163,255,.3); }
+    .status.error { background: rgba(255,107,107,.12); color: #ffdada; border-color: rgba(255,107,107,.35); }
+    .status.warn { background: rgba(255,200,87,.12); color: #fff0c2; border-color: rgba(255,200,87,.35); }
+
+    .hidden { display: none; }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .estimate-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 12px 0 16px;
+    }
+
+    .metric { padding: 14px; border: 1px solid var(--line); background: rgba(255,255,255,.035); border-radius: 14px; min-height: 84px; }
+    .metric.full { grid-column: 1 / -1; min-height: auto; }
+    .metric .label { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+    .metric .value { font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 800; letter-spacing: -0.04em; }
+    .metric .value.text { font-size: 1rem; font-weight: 650; letter-spacing: 0; }
+
+    .results-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .section { margin-top: 20px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+
+    table { width: 100%; border-collapse: collapse; min-width: 760px; background: rgba(11,13,18,.42); }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; background: rgba(255,255,255,.035); }
+    tr:last-child td { border-bottom: 0; }
+    .num { text-align: right; white-space: nowrap; }
+
+    .tag { display: inline-flex; border-radius: 999px; padding: 3px 8px; font-size: .78rem; font-weight: 800; }
+    .tag.high { background: rgba(36,192,139,.16); color: #bff6e2; }
+    .tag.medium { background: rgba(255,200,87,.16); color: #ffe7a4; }
+    .tag.low { background: rgba(255,107,107,.16); color: #ffd1d1; }
+    .tag.none { background: rgba(169,175,191,.14); color: #d4d8e2; }
+    .tag.estimate { background: rgba(77,163,255,.16); color: #cfe5ff; }
+    .tag.caution { background: rgba(255,200,87,.16); color: #ffe7a4; }
+    .tag.risk { background: rgba(255,107,107,.16); color: #ffd1d1; }
+    .flag { display: inline-flex; margin-left: 6px; border-radius: 999px; padding: 2px 7px; font-size: .72rem; border: 1px solid rgba(255,200,87,.45); color: #ffe7a4; background: rgba(255,200,87,.1); }
+
+    .note-list { margin: 0; padding-left: 18px; color: var(--muted); }
+    .note-list li { margin: 6px 0; }
+
+    .markdown-box { white-space: pre-wrap; background: #0b0d12; border: 1px solid var(--line); border-radius: 14px; padding: 14px; font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-height: 340px; overflow: auto; color: #dfe3ec; }
+
+    footer { margin-top: 28px; color: var(--muted); font-size: .84rem; }
+
+    @media (max-width: 920px) {
+      .grid { grid-template-columns: 1fr; }
+      .summary, .estimate-summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>PMI Exam Analysis Parser</h1>
+        <p class="subhead">Paste the source from your PMI Exam Analysis page and this will pull out the buried task scores. Full page source, body-only HTML, the Kendo chart line, or the raw JSON block should all work as long as the task data is still there. Everything runs in your browser.</p>
+      </div>
+    </header>
+
+    <div id="inputPanel" class="grid">
+      <section class="card">
+        <div class="card-inner">
+          <h2>Paste your source</h2>
+          <div id="dropzone" class="dropzone">Paste the source below, or drop/upload a .html or .txt file.</div>
+          <textarea id="sourceInput" spellcheck="false" placeholder="Paste the PMI Exam Analysis source here..."></textarea>
+          <div class="controls">
+            <button id="parseBtn">Parse results</button>
+            <button id="clearBtn" class="secondary">Clear</button>
+            <label for="fileInput" class="file-button secondary">Upload file</label>
+            <input id="fileInput" type="file" accept=".html,.htm,.txt,text/html,text/plain" />
+          </div>
+          <div id="status" class="status"></div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="card-inner">
+          <h2>Getting the source</h2>
+          <ol class="muted">
+            <li>Open PMI CCRS → Report PDUs → Exam Analysis.</li>
+            <li>Open your exam result.</li>
+            <li>Right-click → View Page Source, or use F12 → Sources.</li>
+            <li>Copy the source text and paste it here.</li>
+          </ol>
+          <p class="muted">The useful numbers are hidden in the chart data, not in the visible table. This page looks for <code>ScorePercentage</code>, <code>TotalQuestions</code>, and <code>Tasks</code>, then turns those into estimated raw scores.</p>
+          <p class="muted small">Names, PMI IDs, links, analytics, and account fields are ignored and are not included in the report.</p>
+          <p class="muted small"><strong>Scoring note:</strong> this is a raw-score estimate. PMI's official pass/fail and AT/T/BT/NI ratings may use scaled scoring, so the bands may not match fixed raw percentages.</p>
+          <p class="muted small"><strong>Band estimate:</strong> the band section is based on a small set of community datapoints and older/pre-update reports. It is a rough guide only and has not yet been proven against the new PMBOK8-oriented results.</p>
+        </div>
+      </aside>
+    </div>
+
+    <section id="results" class="card hidden" style="margin-top:18px;">
+      <div class="card-inner">
+        <h2>Results</h2>
+        <div id="summary" class="summary"></div>
+        <div class="results-actions">
+          <button id="copyMarkdownBtn" class="secondary">Copy share summary</button>
+          <button id="downloadCsvBtn" class="secondary">Download CSV</button>
+          <button id="resultClearBtn" class="secondary">Clear / paste another</button>
+        </div>
+
+        <div class="section">
+          <h3>Checks and notes</h3>
+          <ul id="notes" class="note-list"></ul>
+        </div>
+
+        <div class="section">
+          <h3>Unofficial band estimate</h3>
+          <p class="muted small">This is just a rough read based on shared results. It is useful for comparison, but it cannot reproduce PMI's scaled score, pass/fail decision, or official AT/T/BT/NI ratings.</p>
+          <div id="bandSummary" class="estimate-summary"></div>
+          <div class="table-wrap"><table id="bandTable"></table></div>
+        </div>
+
+        <div class="section">
+          <h3>Domain breakdown</h3>
+          <div class="table-wrap"><table id="domainTable"></table></div>
+        </div>
+
+        <div class="section">
+          <h3>Low and medium scoring areas</h3>
+          <div class="table-wrap"><table id="focusTable"></table></div>
+        </div>
+
+        <div class="section">
+          <h3>All tasks</h3>
+          <div class="table-wrap"><table id="taskTable"></table></div>
+        </div>
+
+        <div class="section">
+          <h3>Shareable summary</h3>
+          <p class="muted small">Readable Reddit/comment summary with a consistent data line at the bottom for later aggregation.</p>
+          <div id="markdownOutput" class="markdown-box"></div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Nothing is submitted anywhere. Raw-score conversion uses nearest whole number: <code>round(TotalQuestions × ScorePercentage / 100)</code>. The band estimate is unofficial and PMI may change its scoring model or page structure at any time.
+    </footer>
+  </main>
+
+  <script>
+    const sourceInput = document.getElementById('sourceInput');
+    const inputPanel = document.getElementById('inputPanel');
+    const parseBtn = document.getElementById('parseBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusBox = document.getElementById('status');
+    const results = document.getElementById('results');
+    const summary = document.getElementById('summary');
+    const notes = document.getElementById('notes');
+    const bandSummary = document.getElementById('bandSummary');
+    const bandTable = document.getElementById('bandTable');
+    const domainTable = document.getElementById('domainTable');
+    const focusTable = document.getElementById('focusTable');
+    const taskTable = document.getElementById('taskTable');
+    const markdownOutput = document.getElementById('markdownOutput');
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const copyMarkdownBtn = document.getElementById('copyMarkdownBtn');
+    const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+    const resultClearBtn = document.getElementById('resultClearBtn');
+
+    let latestResult = null;
+
+    function setStatus(message, type = 'info') {
+      statusBox.textContent = message;
+      statusBox.className = type === 'error' ? 'status error' : type === 'warn' ? 'status warn' : 'status';
+      statusBox.style.display = message ? 'block' : 'none';
+    }
+
+    function normaliseSource(raw) {
+      return String(raw || '')
+        .replace(/&quot;/g, '"')
+        .replace(/&#34;/g, '"')
+        .replace(/&#x22;/gi, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/\\u0022/g, '"');
+    }
+
+    function extractBalancedArray(text, openIndex) {
+      let depth = 0;
+      let inString = false;
+      let escapeNext = false;
+
+      for (let i = openIndex; i < text.length; i++) {
+        const ch = text[i];
+
+        if (inString) {
+          if (escapeNext) escapeNext = false;
+          else if (ch === '\\') escapeNext = true;
+          else if (ch === '"') inString = false;
+          continue;
+        }
+
+        if (ch === '"') { inString = true; continue; }
+        if (ch === '[') depth++;
+        if (ch === ']') {
+          depth--;
+          if (depth === 0) return text.slice(openIndex, i + 1);
+        }
+      }
+      return null;
+    }
+
+    function findCandidateDomainArrays(source) {
+      const text = normaliseSource(source);
+      const candidates = [];
+      const seen = new Set();
+
+      const addCandidate = (arr) => {
+        if (!isDomainArray(arr)) return;
+        const signature = JSON.stringify(arr.map(d => [d.Id, d.Name, d.Description, d.TotalQuestions, Array.isArray(d.Tasks) ? d.Tasks.length : 0]));
+        if (seen.has(signature)) return;
+        seen.add(signature);
+        candidates.push(arr);
+      };
+
+      const addFromParsed = (value) => {
+        findDomainArrays(value).forEach(addCandidate);
+      };
+
+      // Case 1: user pasted only the raw JSON array/object.
+      try {
+        addFromParsed(JSON.parse(text.trim()));
+      } catch (err) {
+        // Not plain JSON. Continue with HTML/JS extraction.
+      }
+
+      // Case 2: user pasted full HTML, body HTML, or the Kendo chart script/config line.
+      const dataRegex = /(?:"data"|data)\s*:\s*\[/g;
+      let match;
+      while ((match = dataRegex.exec(text)) !== null) {
+        const open = text.indexOf('[', match.index);
+        const arrText = extractBalancedArray(text, open);
+        if (arrText && hasTaskSignals(arrText)) {
+          try {
+            addFromParsed(JSON.parse(arrText));
+          } catch (err) {
+            // Ignore invalid candidates and keep searching.
+          }
+        }
+        dataRegex.lastIndex = open + 1;
+      }
+
+      // Case 3: user pasted a trimmed section around the domain array without the data key.
+      const taskRegex = /"Tasks"\s*:/g;
+      while ((match = taskRegex.exec(text)) !== null) {
+        let tested = 0;
+        for (let i = match.index; i >= 0 && tested < 40; i--) {
+          if (text[i] !== '[') continue;
+          tested++;
+          const arrText = extractBalancedArray(text, i);
+          if (!arrText || !hasTaskSignals(arrText)) continue;
+          try {
+            addFromParsed(JSON.parse(arrText));
+          } catch (err) {
+            // Keep looking further back.
+          }
+        }
+      }
+
+      return candidates;
+    }
+
+    function hasTaskSignals(text) {
+      const lower = String(text || '').toLowerCase();
+      return lower.includes('"tasks"') && lower.includes('"scorepercentage"') && lower.includes('"totalquestions"');
+    }
+
+    function isDomainArray(value) {
+      return Array.isArray(value) && value.some(item => {
+        if (!item || typeof item !== 'object') return false;
+        const tasks = item.Tasks || item.tasks;
+        return Array.isArray(tasks) && tasks.some(task => task && typeof task === 'object' && ('ScorePercentage' in task || 'scorePercentage' in task || 'scorepercentage' in task));
+      });
+    }
+
+    function findDomainArrays(value, found = [], seenObjects = new WeakSet()) {
+      if (!value || typeof value !== 'object') return found;
+      if (seenObjects.has(value)) return found;
+      seenObjects.add(value);
+
+      if (isDomainArray(value)) {
+        found.push(value);
+        return found;
+      }
+
+      if (Array.isArray(value)) {
+        value.forEach(item => findDomainArrays(item, found, seenObjects));
+        return found;
+      }
+
+      Object.keys(value).forEach(key => findDomainArrays(value[key], found, seenObjects));
+      return found;
+    }
+
+    function cleanText(value) {
+      return String(value ?? '')
+        .replace(/\\n/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function getCorrect(totalQuestions, scorePercentage) {
+      return Math.round(Number(totalQuestions || 0) * Number(scorePercentage || 0) / 100);
+    }
+
+    function classifyTask(scorePercentage, totalQuestions) {
+      const total = Number(totalQuestions || 0);
+      const score = Number(scorePercentage || 0);
+      if (total <= 0) return 'None';
+      if (score <= 50) return 'Low';
+      if (score <= 75) return 'Medium';
+      return 'High';
+    }
+
+    function extractFirst(pattern, text) {
+      const match = pattern.exec(text);
+      return match ? cleanText(match[1].replace(/<[^>]*>/g, ' ')) : '';
+    }
+
+    function extractMetadata(source) {
+      const text = normaliseSource(source);
+      return {
+        examName: extractFirst(/<h3>\s*([^<]+?)\s*(?:<sup>|<\/h3>)/i, text),
+        examDate: extractFirst(/Date of Exam:\s*<\/label>\s*<\/span>\s*<label[^>]*class=["']data["'][^>]*>(.*?)<\/label>/is, text),
+        overallPerformance: extractFirst(/Overall Performance:\s*<span[^>]*>(.*?)<\/span>/is, text),
+        certificateValidThrough: extractFirst(/Your certification is valid through\s*([^<\n\r]+?)(?:<|\n|\r)/is, text),
+        reportAvailableThrough: extractFirst(/Your exam report is available through\s*([^<\n\r]+?)(?:<|\n|\r)/is, text)
+      };
+    }
+
+    function parseExam(source) {
+      const candidates = findCandidateDomainArrays(source);
+      if (!candidates.length) {
+        throw new Error('Could not find the PMI task data. Check that you copied the Exam Analysis HTML/source and that it contains ScorePercentage.');
+      }
+
+      const best = candidates.sort((a, b) => taskCount(b) - taskCount(a))[0];
+      const domains = best.map((domain, domainIndex) => {
+        const domainName = cleanText(domain.Name || domain.Label || `Domain ${domainIndex + 1}`);
+        const domainDescription = cleanText(domain.Description || '');
+        const domainOrder = inferDomainOrder(domainName, domainDescription, domainIndex);
+        const domainColor = String(domain.Color || '').trim();
+        const domainProficiencyType = Number(domain.ProficiencyType || 0);
+        const domainOfficialBand = inferDomainBand(domainColor, domainProficiencyType);
+        return {
+          id: domain.Id,
+          name: domainName,
+          description: domainDescription,
+          order: domainOrder,
+          color: domainColor,
+          proficiencyType: domainProficiencyType,
+          officialBand: domainOfficialBand,
+          totalQuestions: Number(domain.TotalQuestions || 0),
+          questionRatio: Number(domain.QuestionRatio || 0),
+          tasks: (domain.Tasks || []).map((task) => {
+            const totalQuestions = Number(task.TotalQuestions || 0);
+            const scorePercentage = Number(task.ScorePercentage || 0);
+            const displayFlag = Number(task.ProficiencyType) === 0 || String(task.Color || '').toLowerCase() === '#ebebeb';
+            const level = classifyTask(scorePercentage, totalQuestions);
+            return {
+              domain: domainName,
+              domainDescription,
+              domainOrder,
+              taskNo: Number(task.SortOrder || 0),
+              taskName: cleanText(task.Name || task.DisplayText || `Task ${task.SortOrder || ''}`),
+              scorePercentage,
+              totalQuestions,
+              correct: getCorrect(totalQuestions, scorePercentage),
+              level,
+              displayFlag,
+              displayNote: displayFlag && totalQuestions > 0 ? 'PMI display flag detected, but embedded TotalQuestions is greater than zero.' : ''
+            };
+          })
+        };
+      }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+
+      return buildResult(domains, extractMetadata(source));
+    }
+
+    function inferDomainOrder(name, description, fallbackIndex) {
+      const text = `${description || ''} ${name || ''}`.toLowerCase();
+      const match = /domain\s*(\d+)/i.exec(text);
+      if (match) return Number(match[1]);
+      if (text.includes('people')) return 1;
+      if (text.includes('process')) return 2;
+      if (text.includes('business')) return 3;
+      return Number(fallbackIndex || 0) + 1;
+    }
+
+    function inferDomainBand(color, proficiencyType) {
+      const code = String(color || '').trim().toLowerCase();
+      const prof = Number(proficiencyType || 0);
+
+      // Domain ProficiencyType appears to use a different range from task-level Low/Medium/High.
+      // Keep this conservative and expose the raw code in the share text for future validation.
+      if (prof === 7 || code === '#21908e') return 'Above Target';
+      if (prof === 6) return 'Target';
+      if (prof === 5) return 'Below Target';
+      if (prof === 4) return 'Needs Improvement';
+      return '';
+    }
+
+    function taskCount(domains) {
+      return domains.reduce((sum, d) => sum + (Array.isArray(d.Tasks) ? d.Tasks.length : 0), 0);
+    }
+
+    function buildResult(domains, metadata) {
+      const allTasks = domains.flatMap(d => d.tasks);
+      const countedTasks = allTasks.filter(t => t.totalQuestions > 0);
+
+      const domainBreakdown = domains.map(domain => {
+        const tasks = domain.tasks.filter(t => t.totalQuestions > 0);
+        const correct = tasks.reduce((sum, t) => sum + t.correct, 0);
+        const total = tasks.reduce((sum, t) => sum + t.totalQuestions, 0);
+        return {
+          name: domain.name,
+          description: domain.description,
+          order: domain.order,
+          color: domain.color,
+          proficiencyType: domain.proficiencyType,
+          officialBand: domain.officialBand,
+          correct,
+          total,
+          embeddedTotal: domain.totalQuestions,
+          percentage: total ? correct / total * 100 : 0,
+          questionRatio: domain.questionRatio,
+          low: domain.tasks.filter(t => t.level === 'Low').length,
+          medium: domain.tasks.filter(t => t.level === 'Medium').length,
+          high: domain.tasks.filter(t => t.level === 'High').length,
+          none: domain.tasks.filter(t => t.level === 'None').length
+        };
+      });
+
+      const totalCorrect = countedTasks.reduce((sum, t) => sum + t.correct, 0);
+      const totalQuestions = countedTasks.reduce((sum, t) => sum + t.totalQuestions, 0);
+      const embeddedDomainTotal = domains.reduce((sum, d) => sum + d.totalQuestions, 0);
+      const displayFlags = allTasks.filter(t => t.displayFlag && t.totalQuestions > 0);
+      const zeroQuestionRows = allTasks.filter(t => t.totalQuestions <= 0);
+      const totalPercentage = totalQuestions ? totalCorrect / totalQuestions * 100 : 0;
+      const bandEstimates = domainBreakdown.map(estimateDomainBand);
+      const overallEstimate = estimateOverallBand(totalPercentage, domainBreakdown);
+
+      return {
+        metadata,
+        domains,
+        domainBreakdown,
+        bandEstimates,
+        overallEstimate,
+        tasks: allTasks,
+        focusTasks: allTasks.filter(t => t.level === 'Low' || t.level === 'Medium'),
+        displayFlags,
+        zeroQuestionRows,
+        totalCorrect,
+        totalQuestions,
+        embeddedDomainTotal,
+        totalPercentage
+      };
+    }
+
+    function estimateDomainBand(domain) {
+      const pct = Number(domain.percentage || 0);
+      const name = String(domain.name || '').toLowerCase();
+      const questionCount = Number(domain.total || 0);
+
+      if (name.includes('business')) {
+        if (pct < 50) return makeBand(domain, 'NI / BT risk', 'Low', 'Business Environment has only around 14 scored items in current shared data, so one question can move the raw percentage significantly.');
+        if (pct < 65) return makeBand(domain, 'Unstable boundary', 'Very low', 'Community reports show Business Environment bands varying widely in this area, including NI, BT, and AT cases.');
+        if (pct < 72) return makeBand(domain, 'BT / T / AT boundary', 'Very low', 'Business Environment is too small for a reliable raw-band estimate; treat this only as a warning range.');
+        return makeBand(domain, 'AT more likely', 'Low', 'Higher raw results are more often reported as AT, but Business Environment examples still conflict.');
+      }
+
+      if (name.includes('process')) {
+        if (pct < 60) return makeBand(domain, 'NI / BT risk', 'Low', 'Community examples place several Process results around the low-60s in BT/fail-risk territory.');
+        if (pct < 66) return makeBand(domain, 'BT / T boundary', 'Low', 'Reported Process results around 61-65% include BT and T outcomes.');
+        if (pct < 76) return makeBand(domain, 'T / AT boundary', 'Low', 'Reported Process results in the high-60s to mid-70s vary; scaled difficulty likely matters.');
+        return makeBand(domain, 'AT more likely', 'Medium', 'Reported Process results around the high-70s and above are commonly AT.');
+      }
+
+      if (name.includes('people')) {
+        if (pct < 60) return makeBand(domain, 'NI / BT risk', 'Low', 'Limited shared data suggests People below roughly 60% is a risk area.');
+        if (pct < 68) return makeBand(domain, 'BT / T boundary', 'Low', 'Reported People results around the high-60s can still sit near the Target boundary.');
+        if (pct < 78) return makeBand(domain, 'T likely / AT boundary', 'Low', 'Reported People results around 70-73% include Target and Below Target examples, so this is not fixed.');
+        return makeBand(domain, 'AT more likely', 'Medium', 'Reported People results around the high-70s and above are commonly AT.');
+      }
+
+      if (pct < 60) return makeBand(domain, 'NI / BT risk', 'Low', 'Generic estimate only; no domain-specific model available.');
+      if (pct < 68) return makeBand(domain, 'BT / T boundary', 'Low', 'Generic estimate only; no domain-specific model available.');
+      if (pct < 76) return makeBand(domain, 'T / AT boundary', 'Low', 'Generic estimate only; no domain-specific model available.');
+      return makeBand(domain, 'AT more likely', 'Low', 'Generic estimate only; no domain-specific model available.');
+    }
+
+    function makeBand(domain, estimate, confidence, basis) {
+      return {
+        domain: domain.name,
+        correct: domain.correct,
+        total: domain.total,
+        percentage: domain.percentage,
+        estimate,
+        confidence,
+        basis
+      };
+    }
+
+    function estimateOverallBand(totalPercentage, domainBreakdown) {
+      const lowDomains = domainBreakdown.filter(d => Number(d.percentage || 0) < 60);
+      const veryLowDomains = domainBreakdown.filter(d => Number(d.percentage || 0) < 55);
+      let estimate;
+      let confidence;
+      let basis;
+
+      if (totalPercentage < 63) {
+        estimate = 'Fail-risk profile';
+        confidence = 'Low';
+        basis = 'Community data includes a reported fail around 63.4% raw. This does not mean 63.4% is a fixed threshold.';
+      } else if (totalPercentage < 66) {
+        estimate = 'High-risk borderline';
+        confidence = 'Low';
+        basis = 'This sits close to the reported lower edge where pass/fail examples start to overlap.';
+      } else if (totalPercentage < 70) {
+        estimate = 'Borderline pass/fail range';
+        confidence = 'Very low';
+        basis = 'Community examples include both pass and fail outcomes in this raw-score range, depending on domain profile and scaling.';
+      } else if (totalPercentage < 75) {
+        estimate = 'Pass-like, still sensitive';
+        confidence = 'Low';
+        basis = 'Raw score is above several reported pass examples, but a weak domain can still appear to matter.';
+      } else {
+        estimate = 'Strong pass-like profile';
+        confidence = 'Medium';
+        basis = 'Most shared examples at roughly 75%+ overall were passing, often with multiple AT domains.';
+      }
+
+      if (veryLowDomains.length) {
+        basis += ` ${veryLowDomains.map(d => d.name).join(', ')} is below 55%, which should be treated as a material domain risk.`;
+      } else if (lowDomains.length) {
+        basis += ` ${lowDomains.map(d => d.name).join(', ')} is below 60%, so the overall raw score may overstate the profile.`;
+      }
+
+      return { estimate, confidence, basis };
+    }
+
+    function estimateClass(confidence) {
+      const value = String(confidence || '').toLowerCase();
+      if (value.includes('very')) return 'risk';
+      if (value.includes('low')) return 'caution';
+      return 'estimate';
+    }
+
+    function render(result) {
+      latestResult = result;
+      results.classList.remove('hidden');
+
+      summary.innerHTML = `
+        <div class="metric"><div class="label">Estimated raw score</div><div class="value">${result.totalCorrect} / ${result.totalQuestions}</div></div>
+        <div class="metric"><div class="label">Estimated percentage</div><div class="value">${formatPercent(result.totalPercentage)}</div></div>
+        <div class="metric"><div class="label">Question total check</div><div class="value">${result.embeddedDomainTotal || result.totalQuestions}</div></div>
+        <div class="metric"><div class="label">Tasks found</div><div class="value">${result.tasks.length}</div></div>
+        <div class="metric full"><div class="label">Exam metadata</div><div class="value text">${metadataLine(result.metadata)}</div></div>
+      `;
+
+      renderNotes(result);
+      renderBandEstimate(result);
+      renderDomainTable(result.domainBreakdown);
+      renderFocusTable(result.focusTasks);
+      renderTaskTable(result.tasks);
+      markdownOutput.textContent = buildMarkdown(result);
+    }
+
+    function metadataLine(meta) {
+      const parts = [];
+      if (meta.examName) parts.push(meta.examName);
+      if (meta.examDate) parts.push(`Exam date: ${meta.examDate}`);
+      if (meta.overallPerformance) parts.push(`Result: ${meta.overallPerformance}`);
+      if (meta.certificateValidThrough) parts.push(`Certified through: ${meta.certificateValidThrough}`);
+      if (meta.reportAvailableThrough) parts.push(`Report available through: ${meta.reportAvailableThrough}`);
+      return parts.length ? escapeHtml(parts.join(' · ')) : 'No exam metadata detected.';
+    }
+
+    function renderNotes(result) {
+      const items = [];
+      if (result.embeddedDomainTotal === result.totalQuestions) {
+        items.push(`Embedded domain totals reconcile with task totals: ${result.totalQuestions} questions.`);
+      } else {
+        items.push(`Embedded domain totals (${result.embeddedDomainTotal}) do not match summed task totals (${result.totalQuestions}). Check the pasted source.`);
+      }
+      items.push('All rows with TotalQuestions greater than zero are included in totals. This avoids mismatches where the page display marks a task as blank/no-question but the embedded data still shows 0/1.');
+      items.push('Bands used: Low <= 50%, Medium > 50% and <= 75%, High > 75%.');
+      items.push('Raw score is not the same thing as PMI official scoring. Public examples suggest pass/fail and AT/T/BT/NI ratings do not always map cleanly to a fixed raw percentage. Treat this as an estimate of correct answers by task/domain, not a reverse-engineered official score.');
+      items.push('The unofficial band estimate uses limited community datapoints from older/pre-update results. It is not validated against new PMBOK8-oriented exam results.');
+      items.push('The tool does not force a 175-question total; it uses the embedded TotalQuestions values found in the pasted source.');
+      items.push('Personal account identifiers and PMI links are ignored.');
+      if (result.displayFlags.length) {
+        items.push(`${result.displayFlags.length} task(s) had a PMI display flag while still having TotalQuestions greater than zero. These are included and marked in the task table.`);
+      }
+      if (result.zeroQuestionRows.length) {
+        items.push(`${result.zeroQuestionRows.length} task row(s) had TotalQuestions = 0 and are not counted.`);
+      }
+      notes.innerHTML = items.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+    }
+
+    function renderBandEstimate(result) {
+      const overall = result.overallEstimate;
+      bandSummary.innerHTML = `
+        <div class="metric"><div class="label">Overall estimate</div><div class="value text">${escapeHtml(overall.estimate)}</div></div>
+        <div class="metric"><div class="label">Confidence</div><div class="value text">${levelTagClass(overall.confidence)}</div></div>
+        <div class="metric"><div class="label">Model basis</div><div class="value text">Community / legacy data</div></div>
+        <div class="metric"><div class="label">Validation status</div><div class="value text">Not validated for PMBOK8-oriented results</div></div>
+        <div class="metric full"><div class="label">Overall basis</div><div class="value text">${escapeHtml(overall.basis)}</div></div>
+      `;
+
+      bandTable.innerHTML = `
+        <thead><tr><th>Domain</th><th class="num">Raw</th><th class="num">%</th><th>Estimated band</th><th>Confidence</th><th>Basis</th></tr></thead>
+        <tbody>${result.bandEstimates.map(b => `
+          <tr>
+            <td><strong>${escapeHtml(b.domain)}</strong></td>
+            <td class="num">${b.correct}/${b.total}</td>
+            <td class="num">${formatPercent(b.percentage)}</td>
+            <td>${escapeHtml(b.estimate)}</td>
+            <td>${levelTagClass(b.confidence)}</td>
+            <td>${escapeHtml(b.basis)}</td>
+          </tr>
+        `).join('')}</tbody>
+      `;
+    }
+
+    function levelTagClass(text) {
+      return `<span class="tag ${estimateClass(text)}">${escapeHtml(text)}</span>`;
+    }
+
+    function renderDomainTable(rows) {
+      domainTable.innerHTML = `
+        <thead><tr><th>Domain</th><th class="num">Correct</th><th class="num">Total</th><th class="num">%</th><th class="num">Weight</th><th>Page band/code</th><th class="num">Low</th><th class="num">Medium</th><th class="num">High</th></tr></thead>
+        <tbody>${rows.map(r => `
+          <tr>
+            <td><strong>${escapeHtml(r.name)}</strong><br><span class="muted">${escapeHtml(r.description)}</span></td>
+            <td class="num">${r.correct}</td>
+            <td class="num">${r.total}</td>
+            <td class="num">${formatPercent(r.percentage)}</td>
+            <td class="num">${r.questionRatio ? formatPercent(r.questionRatio, 0) : '—'}</td>
+            <td>${escapeHtml(shortBand(r.officialBand) || 'UNK')}<br><span class="muted">prof ${escapeHtml(r.proficiencyType || 'na')} / ${escapeHtml(r.color || 'no color')}</span></td>
+            <td class="num">${r.low}</td>
+            <td class="num">${r.medium}</td>
+            <td class="num">${r.high}</td>
+          </tr>
+        `).join('')}</tbody>
+      `;
+    }
+
+    function renderFocusTable(rows) {
+      if (!rows.length) {
+        focusTable.innerHTML = `<tbody><tr><td>No low or medium task areas detected.</td></tr></tbody>`;
+        return;
+      }
+      focusTable.innerHTML = `
+        <thead><tr><th>Domain</th><th class="num">Task</th><th>Area</th><th class="num">Raw</th><th class="num">%</th><th>Level</th></tr></thead>
+        <tbody>${rows.map(t => taskRow(t)).join('')}</tbody>
+      `;
+    }
+
+    function renderTaskTable(rows) {
+      taskTable.innerHTML = `
+        <thead><tr><th>Domain</th><th class="num">Task</th><th>Area</th><th class="num">Raw</th><th class="num">%</th><th>Level</th></tr></thead>
+        <tbody>${rows.map(t => taskRow(t)).join('')}</tbody>
+      `;
+    }
+
+    function taskRow(t) {
+      const raw = t.totalQuestions > 0 ? `${t.correct}/${t.totalQuestions}` : '—';
+      const flag = t.displayFlag && t.totalQuestions > 0 ? '<span class="flag" title="PMI display flag detected, but TotalQuestions is greater than zero.">display flag</span>' : '';
+      return `
+        <tr>
+          <td>${escapeHtml(t.domain)}</td>
+          <td class="num">${t.taskNo || ''}</td>
+          <td>${escapeHtml(t.taskName)} ${flag}</td>
+          <td class="num">${raw}</td>
+          <td class="num">${formatPercent(t.scorePercentage)}</td>
+          <td>${levelTag(t.level)}</td>
+        </tr>
+      `;
+    }
+
+    function levelTag(level) {
+      const cls = String(level).toLowerCase();
+      return `<span class="tag ${cls}">${escapeHtml(level)}</span>`;
+    }
+
+    function buildMarkdown(result) {
+      const domains = [...result.domainBreakdown].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+      const focus = [...result.focusTasks].sort((a, b) => a.domainOrder - b.domainOrder || a.taskNo - b.taskNo);
+      const estimates = result.bandEstimates
+        .slice()
+        .sort((a, b) => domainOrderFromName(a.domain) - domainOrderFromName(b.domain) || a.domain.localeCompare(b.domain));
+      const officialBands = domains.map(d => shortBand(d.officialBand) || 'UNK').join('/');
+      const totalLow = domains.reduce((sum, d) => sum + d.low, 0);
+      const totalMedium = domains.reduce((sum, d) => sum + d.medium, 0);
+      const totalHigh = domains.reduce((sum, d) => sum + d.high, 0);
+      const totalNone = domains.reduce((sum, d) => sum + d.none, 0);
+      const domainDataLine = domains
+        .map(d => `D${d.order}_${domainShortName(d.name).replace(/\s+/g, '')}=${d.correct}/${d.total}`)
+        .join('; ');
+
+      const lines = [];
+      lines.push('**PMP raw score share — unofficial**');
+      lines.push('');
+      if (result.metadata.examDate) lines.push(`Exam date: ${pipeSafe(result.metadata.examDate)}`);
+      lines.push(`Official result: ${pipeSafe(result.metadata.overallPerformance || 'unknown')}`);
+      lines.push(`Official domain bands: ${officialBands} *(read from page data — edit if needed)*`);
+      lines.push(`Raw estimate: **${result.totalCorrect} / ${result.totalQuestions} (${formatPercent(result.totalPercentage)})**`);
+      lines.push('');
+
+      lines.push('**Domain breakdown**');
+      lines.push('| Domain | Raw | % | Page band |');
+      lines.push('|---|---:|---:|---|');
+      domains.forEach((d) => {
+        lines.push(`| ${mdSafe(domainShortName(d.name))} | ${d.correct} / ${d.total} | ${formatPercent(d.percentage)} | ${shortBand(d.officialBand) || 'Unknown'} |`);
+      });
+      lines.push('');
+
+      lines.push('**Task band count**');
+      lines.push(`Low: ${totalLow} | Medium: ${totalMedium} | High: ${totalHigh} | Blank/none: ${totalNone}`);
+      lines.push('');
+
+      if (focus.length) {
+        lines.push('**Low / medium task areas**');
+        lines.push('| Domain | Task | Raw | % | Level | Area |');
+        lines.push('|---|---:|---:|---:|---|---|');
+        focus.forEach((t) => {
+          lines.push(`| ${mdSafe(domainShortName(t.domain))} | ${t.taskNo || ''} | ${t.correct} / ${t.totalQuestions} | ${formatPercent(t.scorePercentage)} | ${t.level} | ${mdSafe(t.taskName)} |`);
+        });
+        lines.push('');
+      } else {
+        lines.push('Low / medium task areas: none flagged by raw task percentage.');
+        lines.push('');
+      }
+
+      lines.push('**Unofficial band read**');
+      lines.push(`Overall: ${pipeSafe(result.overallEstimate.estimate)} (${pipeSafe(result.overallEstimate.confidence)} confidence)`);
+      estimates.forEach((b) => {
+        lines.push(`- ${domainShortName(b.domain)}: ${pipeSafe(b.estimate)} (${pipeSafe(b.confidence)} confidence)`);
+      });
+      lines.push('');
+
+      lines.push('**Data line for modelling**');
+      lines.push(`\`PMP_DATA total=${result.totalCorrect}/${result.totalQuestions}; pct=${formatNumber(result.totalPercentage)}; ${domainDataLine}; bands=${officialBands}; task_bands=L${totalLow}/M${totalMedium}/H${totalHigh}/N${totalNone}; flags=${result.displayFlags.length}; format=v2\``);
+      lines.push('');
+      lines.push('_Raw estimate only. PMI may use scaled/weighted scoring, so this may not match official pass/fail or AT/T/BT/NI thresholds. PMBOK8-oriented results are not validated yet._');
+      return lines.join('\n');
+    }
+
+    function formatNumber(value, digits = 1) {
+      return Number(value || 0).toFixed(digits);
+    }
+
+    function pipeSafe(value) {
+      return String(value ?? '')
+        .replace(/\|/g, '/')
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function mdSafe(value) {
+      return pipeSafe(value).replace(/`/g, "'");
+    }
+
+    function shortBand(value) {
+      const text = String(value || '').toLowerCase();
+      if (text.includes('above')) return 'AT';
+      if (text.includes('below')) return 'BT';
+      if (text.includes('needs')) return 'NI';
+      if (text === 'target' || (text.includes('target') && !text.includes('above') && !text.includes('below'))) return 'T';
+      return '';
+    }
+
+    function domainShortName(value) {
+      const text = String(value || '').toLowerCase();
+      if (text.includes('people')) return 'People';
+      if (text.includes('process')) return 'Process';
+      if (text.includes('business')) return 'Business';
+      return pipeSafe(value || 'Domain');
+    }
+
+    function domainOrderFromName(value) {
+      const text = String(value || '').toLowerCase();
+      if (text.includes('people')) return 1;
+      if (text.includes('process')) return 2;
+      if (text.includes('business')) return 3;
+      return 99;
+    }
+
+    function compactEstimate(value) {
+      return pipeSafe(value || 'unknown').replace(/\s+/g, '_').replace(/\//g, '-').toLowerCase();
+    }
+
+    function compactConfidence(value) {
+      return pipeSafe(value || 'unknown').replace(/\s+/g, '_').toLowerCase();
+    }
+
+    function formatPercent(value, digits = 1) {
+      return `${Number(value || 0).toFixed(digits)}%`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function toCsv(result) {
+      const headers = ['Domain', 'Task', 'Area', 'Correct', 'Total', 'ScorePercentage', 'Level', 'PMIDisplayFlag', 'DisplayNote'];
+      const rows = result.tasks.map(t => [t.domain, t.taskNo, t.taskName, t.correct, t.totalQuestions, t.scorePercentage, t.level, t.displayFlag ? 'Yes' : 'No', t.displayNote]);
+      return [headers, ...rows].map(row => row.map(csvCell).join(',')).join('\n');
+    }
+
+    function csvCell(value) {
+      const text = String(value ?? '');
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
+
+    function download(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    parseBtn.addEventListener('click', () => {
+      try {
+        const source = sourceInput.value.trim();
+        if (!source) throw new Error('Paste the PMI Exam Analysis source first.');
+        const result = parseExam(source);
+        render(result);
+        const statusType = result.embeddedDomainTotal === result.totalQuestions ? 'info' : 'warn';
+        setStatus(`Parsed ${result.domains.length} domain(s), ${result.tasks.length} task(s), ${result.totalQuestions} total question(s).`, statusType);
+        inputPanel.classList.add('hidden');
+        results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) {
+        inputPanel.classList.remove('hidden');
+        results.classList.add('hidden');
+        setStatus(err.message || String(err), 'error');
+      }
+    });
+
+    function clearAll() {
+      sourceInput.value = '';
+      fileInput.value = '';
+      latestResult = null;
+      results.classList.add('hidden');
+      inputPanel.classList.remove('hidden');
+      setStatus('');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    clearBtn.addEventListener('click', clearAll);
+    resultClearBtn.addEventListener('click', clearAll);
+
+    copyMarkdownBtn.addEventListener('click', async () => {
+      if (!latestResult) return;
+      await navigator.clipboard.writeText(buildMarkdown(latestResult));
+      setStatus('Share summary copied to clipboard.');
+    });
+
+    downloadCsvBtn.addEventListener('click', () => {
+      if (!latestResult) return;
+      download('pmi-exam-analysis-raw-scores.csv', toCsv(latestResult), 'text/csv;charset=utf-8');
+    });
+
+    fileInput.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      sourceInput.value = await file.text();
+      inputPanel.classList.remove('hidden');
+      setStatus(`Loaded ${file.name}. Click Parse results.`);
+    });
+
+    ;['dragenter', 'dragover'].forEach(type => {
+      dropzone.addEventListener(type, (event) => {
+        event.preventDefault();
+        dropzone.classList.add('dragging');
+      });
+    });
+
+    ;['dragleave', 'drop'].forEach(type => {
+      dropzone.addEventListener(type, (event) => {
+        event.preventDefault();
+        dropzone.classList.remove('dragging');
+      });
+    });
+
+    dropzone.addEventListener('drop', async (event) => {
+      const file = event.dataTransfer.files?.[0];
+      if (!file) return;
+      sourceInput.value = await file.text();
+      inputPanel.classList.remove('hidden');
+      setStatus(`Loaded ${file.name}. Click Parse results.`);
+    });
+  </script>
+</body>
+</html>
