@@ -1,6 +1,7 @@
 # PMI Exam Analysis Parser
 
 A small browser-only page for turning PMI CCRS Exam Analysis source code into a readable raw-score breakdown.
+https://forge-deck.github.io/pmp-exam-parser/
 
 ## What it does
 
