@@ -48,3 +48,6 @@ Original Reddit post: https://www.reddit.com/r/pmp/s/1T1hCmyN6U
 The pasted content must contain the embedded chart data with `ScorePercentage`, `TotalQuestions`, and `Tasks`. The full page is not required if the relevant data block is present.
 
 The raw score and band estimate are not official PMI results. The band estimate is based on limited community datapoints from older/pre-update reports and is not validated against PMBOK8-oriented exam results. PMI may change the page structure or scoring model at any time.
+
+## PM Cram
+The ultimate PMP study companion.  https://forge-deck.github.io/pmcram/
